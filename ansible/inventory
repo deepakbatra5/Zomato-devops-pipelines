@@ -1,0 +1,24 @@
+# Ansible Inventory - Zomato Application Servers
+# This file defines the target servers for deployment
+# Update the ansible_host IP after running terraform apply
+
+[app_servers]
+# TODO: Update this IP with output from: terraform output instance_public_ip
+zomato-server ansible_host=3.108.112.197 ansible_user=ubuntu ansible_ssh_private_key_file=~/.ssh/zomato-deploy-key.pem
+
+[app_servers:vars]
+# Python interpreter on Ubuntu
+ansible_python_interpreter=/usr/bin/python3
+
+# Application deployment directory
+app_dir=/home/ubuntu/zomato-app
+
+# Environment
+environment=production
+
+[jenkins_servers]
+# TODO: Update this IP with output from: terraform output jenkins_public_ip
+jenkins-server ansible_host=13.127.116.184 ansible_user=ubuntu ansible_ssh_private_key_file=~/.ssh/zomato-deploy-key.pem
+
+[jenkins_servers:vars]
+ansible_python_interpreter=/usr/bin/python3

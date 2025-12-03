@@ -47,5 +47,34 @@ output "ansible_inventory" {
   value       = <<-EOT
     [app_servers]
     zomato-server ansible_host=${aws_eip.app_server.public_ip} ansible_user=ubuntu ansible_ssh_private_key_file=~/.ssh/${var.key_name}.pem
+    
+    [jenkins_servers]
+    jenkins-server ansible_host=${aws_eip.jenkins_server.public_ip} ansible_user=ubuntu ansible_ssh_private_key_file=~/.ssh/${var.key_name}.pem
   EOT
+}
+
+# Jenkins Server Outputs
+output "jenkins_instance_id" {
+  description = "ID of the Jenkins EC2 instance"
+  value       = aws_instance.jenkins_server.id
+}
+
+output "jenkins_public_ip" {
+  description = "Public IP address of Jenkins server"
+  value       = aws_eip.jenkins_server.public_ip
+}
+
+output "jenkins_public_dns" {
+  description = "Public DNS name of Jenkins server"
+  value       = aws_instance.jenkins_server.public_dns
+}
+
+output "jenkins_url" {
+  description = "URL to access Jenkins web interface"
+  value       = "http://${aws_eip.jenkins_server.public_ip}:8080"
+}
+
+output "jenkins_ssh_command" {
+  description = "SSH command to connect to Jenkins server"
+  value       = "ssh -i ~/.ssh/${var.key_name}.pem ubuntu@${aws_eip.jenkins_server.public_ip}"
 }

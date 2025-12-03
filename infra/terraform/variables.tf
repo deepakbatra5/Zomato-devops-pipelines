@@ -20,9 +20,15 @@ variable "project_name" {
 }
 
 variable "instance_type" {
-  description = "EC2 instance type"
+  description = "EC2 instance type for application server"
   type        = string
   default     = "t3.micro"
+}
+
+variable "jenkins_instance_type" {
+  description = "EC2 instance type for Jenkins server"
+  type        = string
+  default     = "t3.small"  # Jenkins needs more resources (2 vCPU, 2GB RAM)
 }
 
 variable "ami_id" {
