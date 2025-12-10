@@ -102,7 +102,7 @@
       "rating": 4.9,
       "location": "Harbor Bay",
       "menu": [
-        { "name": "Grilled Lobster", "price": 450, "description": null },
+        { "name": "Grilled Lobster", "price": 500, "description": null },
         { "name": "Fish & Chips", "price": 280, "description": null },
         { "name": "Clam Chowder", "price": 190, "description": null },
         { "name": "Shrimp Scampi", "price": 380, "description": null }
