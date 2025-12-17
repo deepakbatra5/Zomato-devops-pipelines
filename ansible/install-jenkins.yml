@@ -1,25 +1,29 @@
 ---
 # Ansible Playbook: Install and Configure Jenkins
-# This playbook installs Jenkins on the dedicated EC2 instance
+# Single instance setup - Jenkins runs on the same server as the application
+# Run this after terraform apply to set up Jenkins
 
-- name: Install Jenkins on EC2
-  hosts: jenkins_servers
+- name: Install Jenkins on Single Instance
+  hosts: servers
   become: yes
   gather_facts: yes
 
   vars:
-    jenkins_admin_user: admin
-    jenkins_admin_password: "{{ lookup('env', 'JENKINS_ADMIN_PASSWORD') | default('admin123', true) }}"
     jenkins_home: /var/lib/jenkins
 
   tasks:
     # ==========================================
-    # 1. WAIT FOR SYSTEM INITIALIZATION
+    # STEP 1: SYSTEM PREPARATION
     # ==========================================
-    - name: Wait for system initialization (90 seconds)
-      pause:
-        seconds: 90
-      when: false  # Skip for now since instance is already running
+    - name: Display installation info
+      debug:
+        msg:
+          - "════════════════════════════════════════════════════════"
+          - "🚀 Installing Jenkins on Single Instance"
+          - "════════════════════════════════════════════════════════"
+          - "Host: {{ ansible_host }}"
+          - "This server will run: Jenkins + Application"
+          - "════════════════════════════════════════════════════════"
 
     - name: Update apt cache
       apt:
@@ -27,9 +31,9 @@
         cache_valid_time: 3600
 
     # ==========================================
-    # 2. INSTALL JENKINS
+    # STEP 2: INSTALL JENKINS PREREQUISITES
     # ==========================================
-    - name: Ensure Java is installed
+    - name: Ensure Java 17 is installed
       apt:
         name: openjdk-17-jdk
         state: present
@@ -45,6 +49,9 @@
         state: present
         filename: jenkins
 
+    # ==========================================
+    # STEP 3: INSTALL JENKINS
+    # ==========================================
     - name: Install Jenkins
       apt:
         name: jenkins
@@ -57,46 +64,28 @@
         state: started
         enabled: yes
 
-    # ==========================================
-    # 3. CONFIGURE JENKINS
-    # ==========================================
     - name: Wait for Jenkins to start
       wait_for:
         port: 8080
         delay: 10
         timeout: 120
 
+    # ==========================================
+    # STEP 4: GET INITIAL PASSWORD
+    # ==========================================
     - name: Get Jenkins initial admin password
       slurp:
         src: "{{ jenkins_home }}/secrets/initialAdminPassword"
       register: jenkins_admin_pwd
       ignore_errors: yes
 
-    - name: Display Jenkins initial admin password
-      debug:
-        msg: "Jenkins initial admin password: {{ jenkins_admin_pwd['content'] | b64decode }}"
+    - name: Store initial password for later display
+      set_fact:
+        jenkins_password: "{{ jenkins_admin_pwd['content'] | b64decode }}"
       when: jenkins_admin_pwd is succeeded
 
     # ==========================================
-    # 4. INSTALL REQUIRED PLUGINS
-    # ==========================================
-    - name: Create Jenkins CLI directory
-      file:
-        path: /opt/jenkins-cli
-        state: directory
-        mode: '0755'
-
-    - name: Download Jenkins CLI
-      get_url:
-        url: "http://localhost:8080/jnlpJars/jenkins-cli.jar"
-        dest: /opt/jenkins-cli/jenkins-cli.jar
-        mode: '0644'
-      retries: 5
-      delay: 10
-      ignore_errors: yes
-
-    # ==========================================
-    # 5. CONFIGURE DOCKER FOR JENKINS
+    # STEP 5: CONFIGURE DOCKER ACCESS
     # ==========================================
     - name: Add jenkins user to docker group
       user:
@@ -116,49 +105,47 @@
         timeout: 60
 
     # ==========================================
-    # 6. SETUP SSH FOR APP SERVER DEPLOYMENT
+    # STEP 6: INSTALL ADDITIONAL TOOLS
     # ==========================================
-    - name: Create .ssh directory for jenkins user
-      file:
-        path: "{{ jenkins_home }}/.ssh"
-        state: directory
-        owner: jenkins
-        group: jenkins
-        mode: '0700'
-
-    - name: Copy SSH key for app server deployment
-      copy:
-        src: ~/.ssh/zomato-deploy-key.pem
-        dest: "{{ jenkins_home }}/.ssh/zomato-deploy-key.pem"
-        owner: jenkins
-        group: jenkins
-        mode: '0600'
-      ignore_errors: yes
-
-    # ==========================================
-    # 7. INSTALL ANSIBLE FOR JENKINS
-    # ==========================================
-    - name: Ensure Ansible is installed
+    - name: Ensure required tools are installed
       apt:
-        name: ansible
+        name:
+          - ansible
+          - git
+          - curl
+          - jq
         state: present
 
     # ==========================================
-    # 8. DEPLOYMENT SUMMARY
+    # STEP 7: INSTALLATION SUMMARY
     # ==========================================
+    - name: Get Jenkins version
+      shell: jenkins --version
+      register: jenkins_version
+      ignore_errors: yes
+
     - name: Jenkins Installation Summary
       debug:
         msg:
-          - "========================================"
-          - "🎉 Jenkins Installed Successfully!"
-          - "========================================"
-          - "Jenkins URL: http://{{ ansible_host }}:8080"
-          - "SSH Access: ssh -i ~/.ssh/zomato-deploy-key.pem ubuntu@{{ ansible_host }}"
+          - "════════════════════════════════════════════════════════"
+          - "🎉 JENKINS INSTALLED SUCCESSFULLY!"
+          - "════════════════════════════════════════════════════════"
           - ""
-          - "Initial Setup:"
-          - "1. Open Jenkins URL in browser"
-          - "2. Use initial admin password (shown above)"
-          - "3. Install suggested plugins"
-          - "4. Create admin user"
-          - "5. Configure pipeline from GitHub"
-          - "========================================"
+          - "📍 Access URLs:"
+          - "   Jenkins:  http://{{ ansible_host }}:8080"
+          - "   Frontend: http://{{ ansible_host }}:3000 (after deploy)"
+          - "   Backend:  http://{{ ansible_host }}:4000 (after deploy)"
+          - ""
+          - "🔑 Initial Admin Password:"
+          - "   {{ jenkins_password | default('Check /var/lib/jenkins/secrets/initialAdminPassword') }}"
+          - ""
+          - "📋 Next Steps:"
+          - "   1. Open Jenkins URL in browser"
+          - "   2. Enter the initial admin password"
+          - "   3. Install suggested plugins"
+          - "   4. Create admin user"
+          - "   5. Add GitHub credentials"
+          - "   6. Create pipeline job"
+          - ""
+          - "💡 Jenkins Version: {{ jenkins_version.stdout | default('Unknown') }}"
+          - "════════════════════════════════════════════════════════"

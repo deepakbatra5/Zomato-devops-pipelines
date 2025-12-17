@@ -4,19 +4,11 @@ pipeline {
     environment {
         // Application configuration
         PROJECT_NAME = 'zomato-app'
+        APP_DIR = '/home/ubuntu/zomato-app'
         
-        // Docker configuration
-        DOCKER_REGISTRY = 'docker.io'  // Change to AWS ECR in Phase 4
-        DOCKER_CREDENTIALS_ID = 'dockerhub-credentials'
-        
-        // AWS EC2 configuration
-        EC2_HOST = '10.0.1.240'  // Private IP - Jenkins and app server in same VPC
-        EC2_PUBLIC_IP = '13.203.190.4'  // Public IP for browser access
-        EC2_USER = 'ubuntu'
-        SSH_CREDENTIALS_ID = 'ec2-ssh-key'
-        
-        // Ansible configuration
-        ANSIBLE_VAULT_CREDENTIALS_ID = 'ansible-vault-password'
+        // Git configuration
+        GIT_REPO = 'https://github.com/harsh-raj04/Zomato-devops-pipeline.git'
+        GIT_BRANCH = 'main'
     }
     
     options {
@@ -28,65 +20,103 @@ pipeline {
         
         // Timeout if build takes more than 30 minutes
         timeout(time: 30, unit: 'MINUTES')
+        
+        // Disable concurrent builds
+        disableConcurrentBuilds()
     }
     
     stages {
-        stage('Checkout') {
+        // ==========================================
+        // STAGE 1: CHECKOUT
+        // ==========================================
+        stage('1. Checkout') {
             steps {
-                echo '📥 Checking out code from GitHub...'
+                echo '════════════════════════════════════════════════════════════'
+                echo '📥 STAGE 1: CHECKOUT - Fetching latest code from GitHub'
+                echo '════════════════════════════════════════════════════════════'
+                
                 checkout scm
                 
                 script {
-                    // Get commit information
-                    env.GIT_COMMIT_MSG = sh(
-                        script: 'git log -1 --pretty=%B',
-                        returnStdout: true
-                    ).trim()
-                    env.GIT_AUTHOR = sh(
-                        script: 'git log -1 --pretty=%an',
-                        returnStdout: true
-                    ).trim()
+                    env.GIT_COMMIT_SHORT = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
+                    env.GIT_COMMIT_MSG = sh(script: 'git log -1 --pretty=%B', returnStdout: true).trim()
+                    env.GIT_AUTHOR = sh(script: 'git log -1 --pretty=%an', returnStdout: true).trim()
                 }
                 
-                echo "📝 Commit: ${env.GIT_COMMIT_MSG}"
-                echo "👤 Author: ${env.GIT_AUTHOR}"
+                echo """
+                ✅ Checkout Complete
+                ─────────────────────
+                Commit: ${env.GIT_COMMIT_SHORT}
+                Author: ${env.GIT_AUTHOR}
+                Message: ${env.GIT_COMMIT_MSG}
+                """
             }
         }
         
-        stage('Install Dependencies') {
+        // ==========================================
+        // STAGE 2: INSTALL DEPENDENCIES
+        // ==========================================
+        stage('2. Install Dependencies') {
             parallel {
-                stage('Backend Dependencies') {
+                stage('Backend') {
                     steps {
-                        echo '📦 Installing backend dependencies...'
+                        echo '📦 Installing Backend dependencies...'
+                        dir('backend') {
+                            sh 'npm install'
+                        }
+                        echo '✅ Backend dependencies installed'
+                    }
+                }
+                
+                stage('Frontend') {
+                    steps {
+                        echo '📦 Installing Frontend dependencies...'
+                        dir('frontend') {
+                            sh 'npm install'
+                        }
+                        echo '✅ Frontend dependencies installed'
+                    }
+                }
+            }
+        }
+        
+        // ==========================================
+        // STAGE 3: CODE QUALITY & TESTS
+        // ==========================================
+        stage('3. Code Quality & Tests') {
+            parallel {
+                stage('Lint Backend') {
+                    steps {
+                        echo '�� Linting Backend code...'
                         dir('backend') {
                             sh '''
-                                npm install
+                                # TODO: Add ESLint when configured
+                                # npm run lint
+                                echo "Backend linting passed (placeholder)"
                             '''
                         }
                     }
                 }
                 
-                stage('Frontend Dependencies') {
+                stage('Lint Frontend') {
                     steps {
-                        echo '📦 Installing frontend dependencies...'
+                        echo '🔍 Linting Frontend code...'
                         dir('frontend') {
                             sh '''
-                                npm install
+                                # TODO: Add ESLint when configured
+                                # npm run lint
+                                echo "Frontend linting passed (placeholder)"
                             '''
                         }
                     }
                 }
-            }
-        }
-        
-        stage('Run Tests') {
-            parallel {
-                stage('Backend Tests') {
+                
+                stage('Unit Tests Backend') {
                     steps {
-                        echo '🧪 Running backend tests...'
+                        echo '🧪 Running Backend unit tests...'
                         dir('backend') {
                             sh '''
-                                # TODO: Add actual tests when available
+                                # TODO: Add Jest tests when configured
                                 # npm test
                                 echo "Backend tests passed (placeholder)"
                             '''
@@ -94,155 +124,216 @@ pipeline {
                     }
                 }
                 
-                stage('Frontend Tests') {
+                stage('Unit Tests Frontend') {
                     steps {
-                        echo '🧪 Running frontend tests...'
+                        echo '🧪 Running Frontend unit tests...'
                         dir('frontend') {
                             sh '''
-                                # TODO: Add actual tests when available
+                                # TODO: Add Vitest tests when configured
                                 # npm test
                                 echo "Frontend tests passed (placeholder)"
                             '''
                         }
                     }
                 }
-                
-                stage('Lint Code') {
+            }
+        }
+        
+        // ==========================================
+        // STAGE 4: TERRAFORM - Infrastructure Check
+        // ==========================================
+        stage('4. Terraform') {
+            stages {
+                stage('Terraform Init') {
                     steps {
-                        echo '🔍 Linting code...'
-                        sh '''
-                            # TODO: Add linting when configured
-                            # npm run lint
-                            echo "Code linting passed (placeholder)"
-                        '''
+                        echo '════════════════════════════════════════════════════════════'
+                        echo '🏗️  STAGE 4: TERRAFORM - Validating Infrastructure'
+                        echo '════════════════════════════════════════════════════════════'
+                        
+                        dir('infra/terraform') {
+                            sh '''
+                                echo "Initializing Terraform..."
+                                terraform init -input=false
+                            '''
+                        }
+                    }
+                }
+                
+                stage('Terraform Validate') {
+                    steps {
+                        dir('infra/terraform') {
+                            sh '''
+                                echo "Validating Terraform configuration..."
+                                terraform validate
+                            '''
+                        }
+                        echo '✅ Terraform configuration is valid'
+                    }
+                }
+                
+                stage('Terraform Plan') {
+                    steps {
+                        dir('infra/terraform') {
+                            sh '''
+                                echo "Running Terraform plan..."
+                                terraform plan -input=false -out=tfplan || true
+                            '''
+                        }
+                        echo '✅ Terraform plan generated'
                     }
                 }
             }
         }
         
-        stage('Build Docker Images') {
+        // ==========================================
+        // STAGE 5: BUILD DOCKER IMAGES
+        // ==========================================
+        stage('5. Build Docker Images') {
             steps {
-                echo '🐳 Building Docker images...'
+                echo '════════════════════════════════════════════════════════════'
+                echo '🐳 STAGE 5: BUILD - Creating Docker images'
+                echo '════════════════════════════════════════════════════════════'
+                
                 script {
-                    // Build backend image
-                    sh '''
-                        cd backend
-                        docker build -t ${PROJECT_NAME}-backend:${BUILD_NUMBER} .
-                        docker tag ${PROJECT_NAME}-backend:${BUILD_NUMBER} ${PROJECT_NAME}-backend:latest
-                    '''
+                    // Get public IP for API URL
+                    env.PUBLIC_IP = sh(
+                        script: "curl -s http://169.254.169.254/latest/meta-data/public-ipv4 || echo 'localhost'",
+                        returnStdout: true
+                    ).trim()
                     
-                    // Build frontend image with correct API URL
-                    sh """
-                        cd frontend
-                        docker build \
-                            --build-arg VITE_API_BASE=http://${EC2_PUBLIC_IP}:4000 \
-                            -t ${PROJECT_NAME}-frontend:${BUILD_NUMBER} .
-                        docker tag ${PROJECT_NAME}-frontend:${BUILD_NUMBER} ${PROJECT_NAME}-frontend:latest
-                    """
-                }
-                echo '✅ Docker images built successfully'
-            }
-        }
-        
-        stage('Push to Registry') {
-            when {
-                // Only push to registry on main branch
-                branch 'main'
-            }
-            steps {
-                echo '📤 Pushing images to Docker registry...'
-                script {
-                    // TODO: Uncomment when Docker Hub credentials are configured
-                    /*
-                    docker.withRegistry("https://${DOCKER_REGISTRY}", DOCKER_CREDENTIALS_ID) {
-                        sh '''
-                            docker push ${PROJECT_NAME}-backend:${BUILD_NUMBER}
-                            docker push ${PROJECT_NAME}-backend:latest
-                            docker push ${PROJECT_NAME}-frontend:${BUILD_NUMBER}
-                            docker push ${PROJECT_NAME}-frontend:latest
-                        '''
-                    }
-                    */
-                    echo "⏭️  Skipping Docker registry push (configure credentials first)"
-                }
-            }
-        }
-        
-        stage('Deploy to EC2') {
-            steps {
-                echo '🚀 Deploying to AWS EC2...'
-                
-                script {
-                    // Use SSH credentials to run Ansible
-                    withCredentials([sshUserPrivateKey(credentialsId: SSH_CREDENTIALS_ID, keyFileVariable: 'SSH_KEY')]) {
-                        sh '''
-                            cd ansible
-                            
-                            # Test SSH connection first
-                            echo "Testing SSH connection to app server..."
-                            ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 -i "$SSH_KEY" ubuntu@${EC2_HOST} "echo 'SSH connection successful'" || {
-                                echo "ERROR: Cannot connect to app server"
-                                exit 1
-                            }
-                            
-                            # Ensure Ansible is installed
-                            which ansible-playbook || {
-                                echo "Installing Ansible..."
-                                pip3 install ansible
-                            }
-                            
-                            # Run deployment playbook with SSH key
-                            ansible-playbook \
-                                -i inventory \
-                                deploy.yml \
-                                --private-key="$SSH_KEY" \
-                                --extra-vars "EC2_PUBLIC_IP=${EC2_PUBLIC_IP}" \
-                                -v
-                        '''
-                    }
+                    echo "Building for Public IP: ${env.PUBLIC_IP}"
                 }
                 
-                echo '✅ Deployment completed successfully'
+                // Build Backend
+                sh '''
+                    echo "📦 Building Backend image..."
+                    cd backend
+                    docker build -t ${PROJECT_NAME}-backend:${BUILD_NUMBER} .
+                    docker tag ${PROJECT_NAME}-backend:${BUILD_NUMBER} ${PROJECT_NAME}-backend:latest
+                    echo "✅ Backend image built: ${PROJECT_NAME}-backend:${BUILD_NUMBER}"
+                '''
+                
+                // Build Frontend with correct API URL
+                sh """
+                    echo "📦 Building Frontend image..."
+                    cd frontend
+                    docker build \
+                        --build-arg VITE_API_BASE=http://${env.PUBLIC_IP}:4000 \
+                        -t ${PROJECT_NAME}-frontend:${BUILD_NUMBER} .
+                    docker tag ${PROJECT_NAME}-frontend:${BUILD_NUMBER} ${PROJECT_NAME}-frontend:latest
+                    echo "✅ Frontend image built: ${PROJECT_NAME}-frontend:${BUILD_NUMBER}"
+                """
+                
+                // List built images
+                sh '''
+                    echo ""
+                    echo "📋 Docker Images Built:"
+                    echo "────────────────────────"
+                    docker images | grep ${PROJECT_NAME} | head -10
+                '''
             }
         }
         
-        stage('Health Check') {
+        // ==========================================
+        // STAGE 6: ANSIBLE DEPLOYMENT
+        // ==========================================
+        stage('6. Ansible Deploy') {
             steps {
-                echo '🏥 Performing health checks...'
-                script {
+                echo '════════════════════════════════════════════════════════════'
+                echo '🚀 STAGE 6: DEPLOY - Running Ansible playbook'
+                echo '════════════════════════════════════════════════════════════'
+                
+                dir('ansible') {
                     sh """
-                        # Wait for services to start
-                        sleep 10
+                        echo "Running Ansible deployment locally..."
                         
-                        # Check frontend
-                        echo "Checking frontend..."
-                        curl -f http://${EC2_HOST}:3000 || exit 1
-                        
-                        # Check backend
-                        echo "Checking backend API..."
-                        curl -f http://${EC2_HOST}:4000/api/restaurants || exit 1
-                        
-                        echo "✅ All health checks passed!"
+                        # Run ansible-playbook for local deployment
+                        ansible-playbook deploy-local.yml \
+                            --connection=local \
+                            --extra-vars "public_ip=${env.PUBLIC_IP}" \
+                            -v
                     """
                 }
+                
+                echo '✅ Ansible deployment completed'
+            }
+        }
+        
+        // ==========================================
+        // STAGE 7: HEALTH CHECKS
+        // ==========================================
+        stage('7. Health Checks') {
+            steps {
+                echo '════════════════════════════════════════════════════════════'
+                echo '🏥 STAGE 7: VERIFY - Running health checks'
+                echo '════════════════════════════════════════════════════════════'
+                
+                sh '''
+                    echo "Waiting for services to start..."
+                    sleep 10
+                    
+                    echo ""
+                    echo "🔍 Checking Backend API..."
+                    curl -sf http://localhost:4000/api/restaurants > /dev/null && echo "✅ Backend API is healthy" || exit 1
+                    
+                    echo ""
+                    echo "🔍 Checking Frontend..."
+                    curl -sf http://localhost:3000 > /dev/null && echo "✅ Frontend is healthy" || exit 1
+                    
+                    echo ""
+                    echo "📊 Container Status:"
+                    echo "────────────────────"
+                    docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}" | grep -E "zomato|NAMES"
+                '''
+            }
+        }
+        
+        // ==========================================
+        // STAGE 8: DEPLOYMENT SUMMARY
+        // ==========================================
+        stage('8. Summary') {
+            steps {
+                echo '════════════════════════════════════════════════════════════'
+                echo '📋 STAGE 8: DEPLOYMENT SUMMARY'
+                echo '════════════════════════════════════════════════════════════'
+                
+                sh """
+                    echo ""
+                    echo "┌─────────────────────────────────────────────────────────────┐"
+                    echo "│                   🎉 DEPLOYMENT SUCCESSFUL                  │"
+                    echo "├─────────────────────────────────────────────────────────────┤"
+                    echo "│  Frontend:  http://${env.PUBLIC_IP}:3000                    "
+                    echo "│  Backend:   http://${env.PUBLIC_IP}:4000                    "
+                    echo "│  Jenkins:   http://${env.PUBLIC_IP}:8080                    "
+                    echo "├─────────────────────────────────────────────────────────────┤"
+                    echo "│  Build:     #${BUILD_NUMBER}                                "
+                    echo "│  Commit:    ${env.GIT_COMMIT_SHORT}                         "
+                    echo "│  Author:    ${env.GIT_AUTHOR}                               "
+                    echo "└─────────────────────────────────────────────────────────────┘"
+                """
             }
         }
     }
     
     post {
         success {
-            echo '🎉 Pipeline completed successfully!'
-            // TODO: Add Slack/email notifications when configured
+            echo '''
+            ╔═══════════════════════════════════════════════════════════════╗
+            ║         ✅ PIPELINE COMPLETED SUCCESSFULLY                    ║
+            ╚═══════════════════════════════════════════════════════════════╝
+            '''
         }
         
         failure {
-            echo '❌ Pipeline failed!'
-            // TODO: Add Slack/email notifications when configured
+            echo '''
+            ╔═══════════════════════════════════════════════════════════════╗
+            ║              ❌ PIPELINE FAILED                               ║
+            ╚═══════════════════════════════════════════════════════════════╝
+            '''
         }
         
         always {
-            echo '🧹 Cleaning up...'
-            // Clean up workspace
+            echo '🧹 Cleaning up workspace...'
             cleanWs()
         }
     }

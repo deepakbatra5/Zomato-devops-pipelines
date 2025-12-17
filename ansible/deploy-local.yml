@@ -1,0 +1,219 @@
+---
+# Ansible Playbook: Deploy Zomato Application Locally
+# This playbook runs on the same server as Jenkins (single instance setup)
+# It deploys the containerized application using docker-compose
+
+- name: Deploy Zomato Application (Local)
+  hosts: localhost
+  connection: local
+  become: yes
+  gather_facts: yes
+
+  vars:
+    app_dir: /home/ubuntu/zomato-app
+    repo_url: https://github.com/harsh-raj04/Zomato-devops-pipeline.git
+    branch: "{{ lookup('env', 'GIT_BRANCH') | default('main', true) | regex_replace('^origin/', '') }}"
+    public_ip: "{{ public_ip | default(ansible_default_ipv4.address, true) }}"
+    workspace_dir: "{{ lookup('env', 'WORKSPACE') | default('/var/lib/jenkins/workspace/Zomato-DevOps-Pipeline', true) }}"
+
+  tasks:
+    # ==========================================
+    # STEP 1: DISPLAY DEPLOYMENT INFO
+    # ==========================================
+    - name: Display deployment information
+      debug:
+        msg:
+          - "════════════════════════════════════════════════════════"
+          - "🚀 Starting Local Ansible Deployment"
+          - "════════════════════════════════════════════════════════"
+          - "App Directory: {{ app_dir }}"
+          - "Branch: {{ branch }}"
+          - "Public IP: {{ public_ip }}"
+          - "Workspace: {{ workspace_dir }}"
+          - "════════════════════════════════════════════════════════"
+
+    # ==========================================
+    # STEP 2: ENSURE DOCKER IS RUNNING
+    # ==========================================
+    - name: Ensure Docker service is running
+      systemd:
+        name: docker
+        state: started
+        enabled: yes
+      tags: docker
+
+    # ==========================================
+    # STEP 3: PREPARE APPLICATION DIRECTORY
+    # ==========================================
+    - name: Create app directory if not exists
+      file:
+        path: "{{ app_dir }}"
+        state: directory
+        owner: ubuntu
+        group: ubuntu
+        mode: '0755'
+
+    - name: Sync code from Jenkins workspace to app directory
+      synchronize:
+        src: "{{ workspace_dir }}/"
+        dest: "{{ app_dir }}/"
+        recursive: yes
+        delete: no
+      delegate_to: localhost
+      become_user: ubuntu
+
+    - name: Set correct ownership
+      file:
+        path: "{{ app_dir }}"
+        owner: ubuntu
+        group: ubuntu
+        recurse: yes
+
+    # ==========================================
+    # STEP 4: STOP EXISTING CONTAINERS
+    # ==========================================
+    - name: Stop existing containers
+      shell: docker compose down || docker-compose down || true
+      args:
+        chdir: "{{ app_dir }}"
+      become_user: ubuntu
+      ignore_errors: yes
+      register: stop_result
+
+    - name: Display stop result
+      debug:
+        msg: "Stopped existing containers: {{ stop_result.rc == 0 }}"
+
+    # ==========================================
+    # STEP 5: REMOVE DATABASE VOLUME FOR FRESH SEEDING
+    # ==========================================
+    - name: Remove database volume for fresh seeding
+      shell: docker volume rm zomato-app_dbdata || true
+      ignore_errors: yes
+      register: volume_removal
+
+    - name: Display volume removal result
+      debug:
+        msg: "Database volume removed for fresh seeding"
+      when: volume_removal.rc == 0
+
+    # ==========================================
+    # STEP 6: CLEAN UP OLD IMAGES
+    # ==========================================
+    - name: Remove old Docker images to save space
+      shell: docker image prune -af --filter "until=24h"
+      ignore_errors: yes
+
+    # ==========================================
+    # STEP 7: START CONTAINERS WITH DOCKER COMPOSE
+    # ==========================================
+    - name: Build and start application with docker-compose
+      shell: |
+        export VITE_API_BASE=http://{{ public_ip }}:4000
+        docker compose build --no-cache frontend
+        docker compose up -d --build
+      args:
+        chdir: "{{ app_dir }}"
+      become_user: ubuntu
+      environment:
+        VITE_API_BASE: "http://{{ public_ip }}:4000"
+      register: compose_result
+
+    - name: Display docker compose result
+      debug:
+        var: compose_result.stdout_lines
+
+    # ==========================================
+    # STEP 8: WAIT FOR SERVICES TO BE HEALTHY
+    # ==========================================
+    - name: Wait for database to be healthy
+      shell: |
+        for i in {1..30}; do
+          if docker compose ps db | grep -q "healthy"; then
+            echo "Database is healthy"
+            exit 0
+          fi
+          echo "Waiting for database... ($i/30)"
+          sleep 2
+        done
+        echo "Database health check timed out"
+        exit 1
+      args:
+        chdir: "{{ app_dir }}"
+      become_user: ubuntu
+      register: db_health
+
+    - name: Wait for backend to start
+      wait_for:
+        port: 4000
+        host: localhost
+        delay: 5
+        timeout: 60
+
+    - name: Wait for frontend to start
+      wait_for:
+        port: 3000
+        host: localhost
+        delay: 5
+        timeout: 60
+
+    # ==========================================
+    # STEP 9: VERIFY DEPLOYMENT
+    # ==========================================
+    - name: Check running containers
+      shell: docker compose ps
+      args:
+        chdir: "{{ app_dir }}"
+      become_user: ubuntu
+      register: container_status
+
+    - name: Display container status
+      debug:
+        msg: "{{ container_status.stdout_lines }}"
+
+    - name: Verify backend API
+      uri:
+        url: "http://localhost:4000/api/restaurants"
+        method: GET
+        status_code: 200
+      register: backend_check
+      retries: 5
+      delay: 3
+      until: backend_check.status == 200
+
+    - name: Display restaurant count
+      debug:
+        msg: "Backend API returned {{ backend_check.json | length }} restaurants"
+      when: backend_check.json is defined
+
+    - name: Verify frontend
+      uri:
+        url: "http://localhost:3000"
+        method: GET
+        status_code: 200
+      register: frontend_check
+      retries: 5
+      delay: 3
+      until: frontend_check.status == 200
+
+    # ==========================================
+    # STEP 10: DEPLOYMENT SUMMARY
+    # ==========================================
+    - name: Deployment Summary
+      debug:
+        msg:
+          - "════════════════════════════════════════════════════════"
+          - "🎉 ANSIBLE DEPLOYMENT SUCCESSFUL!"
+          - "════════════════════════════════════════════════════════"
+          - ""
+          - "📍 Application URLs:"
+          - "   Frontend: http://{{ public_ip }}:3000"
+          - "   Backend:  http://{{ public_ip }}:4000"
+          - "   API Test: http://{{ public_ip }}:4000/api/restaurants"
+          - ""
+          - "📊 Deployment Details:"
+          - "   Branch: {{ branch }}"
+          - "   App Directory: {{ app_dir }}"
+          - "   Containers: {{ container_status.stdout_lines | length - 1 }} running"
+          - ""
+          - "════════════════════════════════════════════════════════"
