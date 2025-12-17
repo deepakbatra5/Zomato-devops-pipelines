@@ -1,23 +1,23 @@
-# EC2 Instance - Main application server
-# Runs Docker containers for frontend, backend, and database
+# Jenkins EC2 Instance - CI/CD Server
+# Dedicated instance for running Jenkins pipelines
 
-resource "aws_instance" "app_server" {
+resource "aws_instance" "jenkins_server" {
   ami                    = var.ami_id
-  instance_type          = var.instance_type
+  instance_type          = var.jenkins_instance_type
   key_name               = var.key_name
   subnet_id              = aws_subnet.public.id
-  vpc_security_group_ids = [aws_security_group.app_server.id]
+  vpc_security_group_ids = [aws_security_group.jenkins_sg.id]
 
   # Root volume configuration
   root_block_device {
-    volume_size           = 30  # GB
+    volume_size           = 30  # GB - Jenkins needs more space for builds
     volume_type           = "gp3"
     delete_on_termination = true
     encrypted             = true
   }
 
   # User data script - runs on first boot
-  # Installs Docker, docker-compose, and basic tools
+  # Installs basic tools and Docker
   user_data = <<-EOF
               #!/bin/bash
               set -e
@@ -34,7 +34,9 @@ resource "aws_instance" "app_server" {
                 gnupg \
                 lsb-release \
                 git \
-                unzip
+                unzip \
+                python3-pip \
+                openjdk-17-jdk
               
               # Install Docker
               curl -fsSL https://get.docker.com -o get-docker.sh
@@ -53,15 +55,18 @@ resource "aws_instance" "app_server" {
                 -o /usr/local/lib/docker/cli-plugins/docker-compose
               chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
               
-              # Create application directory
-              mkdir -p /home/ubuntu/app
-              chown ubuntu:ubuntu /home/ubuntu/app
+              # Install Node.js (for building frontend/backend)
+              curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
+              apt-get install -y nodejs
+              
+              # Install Ansible
+              apt-get install -y ansible
               
               # Log completion
               echo "Setup completed at $(date)" > /var/log/user-data.log
               EOF
 
-  # Metadata options for IMDSv2 (security best practice)
+  # Metadata options for IMDSv2
   metadata_options {
     http_endpoint               = "enabled"
     http_tokens                 = "required"
@@ -69,20 +74,19 @@ resource "aws_instance" "app_server" {
   }
 
   tags = {
-    Name = "${var.project_name}-${var.environment}-server"
+    Name = "${var.project_name}-${var.environment}-jenkins"
+    Role = "Jenkins-CI-CD"
   }
 }
 
-# Elastic IP - Static public IP for the instance
-# Useful for DNS and consistent access
-resource "aws_eip" "app_server" {
-  instance = aws_instance.app_server.id
+# Elastic IP for Jenkins - Static public IP
+resource "aws_eip" "jenkins_server" {
+  instance = aws_instance.jenkins_server.id
   domain   = "vpc"
 
   tags = {
-    Name = "${var.project_name}-${var.environment}-eip"
+    Name = "${var.project_name}-${var.environment}-jenkins-eip"
   }
 
-  # Ensure EIP is created after internet gateway
   depends_on = [aws_internet_gateway.main]
 }

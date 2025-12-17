@@ -1,10 +1,9 @@
 # Security Group - Firewall rules for EC2 instance
 # Controls inbound and outbound traffic
-# Single instance runs both Jenkins and Application
 
 resource "aws_security_group" "app_server" {
   name        = "${var.project_name}-${var.environment}-sg"
-  description = "Security group for Zomato application server (Jenkins + App)"
+  description = "Security group for Zomato application server"
   vpc_id      = aws_vpc.main.id
 
   # SSH access - for management and deployment
@@ -30,15 +29,6 @@ resource "aws_security_group" "app_server" {
     description = "HTTPS from anywhere"
     from_port   = 443
     to_port     = 443
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  # Jenkins web interface
-  ingress {
-    description = "Jenkins web UI"
-    from_port   = 8080
-    to_port     = 8080
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
