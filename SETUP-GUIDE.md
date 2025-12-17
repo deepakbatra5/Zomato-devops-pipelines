@@ -105,7 +105,7 @@ Click **Save and Continue**
 **Settings:**
 - **Kind:** SSH Username with private key
 - **Scope:** Global
-- **ID:** `cat ~/.ssh/zomato-deploy-key.pem`
+- **ID:** `ec2-ssh-key`
 - **Username:** `ubuntu`
 - **Private Key:** Enter directly
 - **Key:** [Paste content below]
