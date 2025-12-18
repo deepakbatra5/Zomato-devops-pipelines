@@ -9,7 +9,7 @@ const QUICK_REPLIES = [
   "Recommend something spicy"
 ];
 
-const INITIAL_MESSAGE = "Hello! 👋 I'm FoodBot, your AI assistant powered by Google Gemini. How can I help you today?";
+const INITIAL_MESSAGE = "Hello! 👋 I'm FoodBot, your AI assistant powered by GPT-4. How can I help you today?";
 
 export default function Chatbot() {
   const [isOpen, setIsOpen] = useState(false);

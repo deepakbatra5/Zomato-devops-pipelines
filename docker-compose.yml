@@ -23,7 +23,7 @@ services:
     environment:
       DATABASE_URL: postgres://postgres:postgres@db:5432/zomato
       JWT_SECRET: supersecret_jwt_key
-      GEMINI_API_KEY: ${GEMINI_API_KEY:-AIzaSyC86z76aFenvkLvSA5RHma55DM9prXkMzg}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
     ports:
       - "4000:4000"
     depends_on:

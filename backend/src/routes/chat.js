@@ -1,8 +1,7 @@
 const express = require('express');
 const router = express.Router();
 
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const GEMINI_MODEL = 'gemini-2.0-flash';
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
 // System prompt for the food delivery chatbot
 const SYSTEM_PROMPT = `You are FoodBot, a friendly AI assistant for FoodHub - a food delivery platform similar to Zomato/Swiggy.
@@ -14,7 +13,7 @@ Your role:
 - Use food emojis occasionally to be engaging 🍕🍔🍜
 
 Available restaurants on our platform:
-1. Spice Garden - North Indian (Rating: 4.5) - Known for Butter Chicken, Biryani
+1. Spice Garden - North Indian (Rating: 4.5) - Known for Butter Chicken ₹275, Biryani ₹220
 2. Pizza Paradise - Italian (Rating: 4.3) - Best pizzas and pasta
 3. Dragon Wok - Chinese (Rating: 4.6) - Famous for noodles and manchurian
 4. Biryani House - Hyderabadi (Rating: 4.8) - Premium biryanis
@@ -31,7 +30,7 @@ Key information:
 - Orders can be cancelled before preparation starts
 - Refunds process in 3-5 business days
 
-Keep responses short (under 100 words) unless user asks for details.`;
+Keep responses short (under 100 words) unless user asks for details. Be helpful and friendly!`;
 
 router.post('/', async (req, res) => {
   try {
@@ -41,58 +40,50 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: 'Message is required' });
     }
 
-    if (!GEMINI_API_KEY) {
-      // Fallback to basic responses if no API key
+    if (!OPENAI_API_KEY) {
       return res.json({ 
         reply: getFallbackResponse(message),
         source: 'fallback'
       });
     }
 
-    // Build conversation history for context
-    const contents = [
-      {
-        role: 'user',
-        parts: [{ text: SYSTEM_PROMPT + '\n\nUser: ' + message }]
-      }
+    // Build conversation messages
+    const messages = [
+      { role: 'system', content: SYSTEM_PROMPT }
     ];
 
-    // Add previous messages for context (last 5 exchanges)
+    // Add previous messages for context (last 10 exchanges)
     if (history.length > 0) {
       const recentHistory = history.slice(-10);
-      contents[0].parts[0].text = SYSTEM_PROMPT + '\n\nPrevious conversation:\n' + 
-        recentHistory.map(h => `${h.type === 'user' ? 'User' : 'FoodBot'}: ${h.text}`).join('\n') +
-        '\n\nUser: ' + message;
+      recentHistory.forEach(h => {
+        messages.push({
+          role: h.type === 'user' ? 'user' : 'assistant',
+          content: h.text
+        });
+      });
     }
 
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents,
-          generationConfig: {
-            temperature: 0.7,
-            topK: 40,
-            topP: 0.95,
-            maxOutputTokens: 256,
-          },
-          safetySettings: [
-            { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
-            { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
-            { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
-            { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
-          ]
-        })
-      }
-    );
+    // Add current message
+    messages.push({ role: 'user', content: message });
+
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${OPENAI_API_KEY}`
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages,
+        max_tokens: 256,
+        temperature: 0.7
+      })
+    });
 
     const data = await response.json();
 
     if (data.error) {
-      console.error('Gemini API error:', data.error);
-      // Rate limited or other error - use fallback
+      console.error('OpenAI API error:', data.error);
       return res.json({ 
         reply: getFallbackResponse(message),
         source: 'fallback',
@@ -100,9 +91,9 @@ router.post('/', async (req, res) => {
       });
     }
 
-    const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || getFallbackResponse(message);
+    const reply = data.choices?.[0]?.message?.content || getFallbackResponse(message);
     
-    res.json({ reply, source: 'gemini' });
+    res.json({ reply, source: 'openai' });
 
   } catch (error) {
     console.error('Chat error:', error);
