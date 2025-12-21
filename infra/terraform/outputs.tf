@@ -23,7 +23,7 @@ output "vpc_id" {
 
 output "security_group_id" {
   description = "ID of the security group"
-  value       = aws_security_group.cicd-app-server.id
+  value       = aws_security_group.app_server.id
 }
 
 output "ssh_command" {

@@ -80,8 +80,8 @@ resource "aws_instance" "Jenkins" {
 }
 
 # Elastic IP for Jenkins - Static public IP
-resource "aws_eip" "jenkins_server" {
-  instance = aws_instance.jenkins_server.id
+resource "aws_eip" "Jenkins" {
+  instance = aws_instance.Jenkins.id
   domain   = "vpc"
 
   tags = {

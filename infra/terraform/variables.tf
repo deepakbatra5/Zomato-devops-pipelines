@@ -4,7 +4,7 @@
 variable "aws_region" {
   description = "AWS region for resources"
   type        = string
-  default     = "ap-south-1"
+  default     = "us-east-1"
 }
 
 variable "environment" {
@@ -32,10 +32,10 @@ variable "jenkins_instance_type" {
 }
 
 variable "ami_id" {
-  description = "AMI ID for EC2 instance (Ubuntu 22.04 LTS in ap-south-1)"
+  description = "AMI ID for EC2 instance (Ubuntu 22.04 LTS in us-east-1)"
   type        = string
   # TODO: Update this AMI ID for your region if different
-  # This is Ubuntu 22.04 LTS for ap-south-1
+  # This is Ubuntu 22.04 LTS for us-east-1
   # Find latest: aws ec2 describe-images --owners 099720109477 --filters "Name=name,Values=ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-amd64-server-*" --query 'Images | sort_by(@, &CreationDate) | [-1].ImageId'
   default     = "ami-03deb8c961063af8c"
 }
