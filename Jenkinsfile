@@ -222,11 +222,11 @@ pipeline {
                         
                         # Check frontend
                         echo "Checking frontend..."
-                        curl -f http://${EC2_HOST}:3000 || exit 1
+                        curl -f http://${EC2_PUBLIC_IP}:3000 || exit 1
                         
                         # Check backend
                         echo "Checking backend API..."
-                        curl -f http://${EC2_HOST}:4000/api/restaurants || exit 1
+                        curl -f http://${EC2_PUBLIC_IP}:4000/api/restaurants || exit 1
                         
                         echo "✅ All health checks passed!"
                     """
