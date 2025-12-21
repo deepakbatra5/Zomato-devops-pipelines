@@ -1,7 +1,7 @@
 # Security Group - Firewall rules for EC2 instance
 # Controls inbound and outbound traffic
 
-resource "aws_security_group" "app_server" {
+resource "aws_security_group" "cicd-app-server" {
   name        = "${var.project_name}-${var.environment}-sg"
   description = "Security group for Zomato application server"
   vpc_id      = aws_vpc.main.id

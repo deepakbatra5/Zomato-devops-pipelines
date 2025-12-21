@@ -1,7 +1,7 @@
 # Jenkins EC2 Instance - CI/CD Server
 # Dedicated instance for running Jenkins pipelines
 
-resource "aws_instance" "jenkins_server" {
+resource "aws_instance" "Jenkins" {
   ami                    = var.ami_id
   instance_type          = var.jenkins_instance_type
   key_name               = var.key_name
