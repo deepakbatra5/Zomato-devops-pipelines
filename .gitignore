@@ -24,4 +24,13 @@ infra/terraform/*.tfvars
 ansible/*.retry
 ansible/roles/*/files/*.pem
 .DS_Store
-10.txt
+10.txt# Setup documentation files
+jenkins/README.md
+ansible/README.md
+infra/terraform/README.md
+
+# Setup and credentials files
+SETUP-GUIDE.md
+JENKINS-CREDENTIALS.md
+jenkins/QUICKSTART.md
+jenkins/SETUP-EC2.md

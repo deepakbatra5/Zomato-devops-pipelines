@@ -11,6 +11,7 @@ app.use(bodyParser.json());
 app.use('/api/auth',require('./routes/auth'));
 app.use('/api/restaurants',require('./routes/restaurants'));
 app.use('/api/orders',require('./routes/orders'));
+app.use('/api/chat',require('./routes/chat'));
 app.get('/healthz',(req,res)=>res.json({status:'ok'}));
 
 async function init(){
@@ -22,7 +23,9 @@ async function init(){
         name: restaurantInfo.name,
         cuisine: restaurantInfo.cuisine,
         rating: restaurantInfo.rating,
-        location: restaurantInfo.location
+        location: restaurantInfo.location,
+        image: restaurantInfo.image,
+        deliveryTime: restaurantInfo.deliveryTime
       });
       
       // Create menu items for this restaurant
@@ -30,6 +33,10 @@ async function init(){
         name: item.name,
         price: item.price,
         description: item.description,
+        image: item.image,
+        category: item.category,
+        isVeg: item.isVeg !== undefined ? item.isVeg : true,
+        isBestseller: item.isBestseller || false,
         RestaurantId: restaurant.id
       }));
       

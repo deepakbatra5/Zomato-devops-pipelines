@@ -1,8 +1,88 @@
-import React,{useState}from'react';import api from'../api';import {saveAuth}from'../auth';import {useNavigate,Link}from'react-router-dom';
-export default function Login(){const n=useNavigate();const[email,setEmail]=useState('');const[p,setP]=useState('');const[err,setErr]=useState('');
-const sub=async e=>{e.preventDefault();setErr('');if(!email||!p){setErr('All fields required');return;}try{const r=await api.post('/api/auth/login',{email,password:p});saveAuth(r.data);n('/');}catch(e){setErr(e.response?.data?.error||'Login failed')}};return(
-<div className="form-container"><h2>Welcome Back 👋</h2>{err&&<div className="alert alert-error">{err}</div>}<form onSubmit={sub}>
-<div className="form-group"><label>Email</label><input type="email" value={email}onChange={e=>setEmail(e.target.value)}/></div>
-<div className="form-group"><label>Password</label><input type="password" value={p}onChange={e=>setP(e.target.value)}/></div>
-<button type="submit" className="btn btn-primary">Login</button></form>
-<p style={{marginTop:'1rem',textAlign:'center'}}>No account? <Link to="/signup" style={{color:'var(--primary)',fontWeight:600}}>Sign up here</Link></p></div>);}
+import React, { useState } from 'react';
+import api from '../api';
+import { saveAuth } from '../auth';
+import { useNavigate, Link } from 'react-router-dom';
+
+export default function Login() {
+  const navigate = useNavigate();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    
+    if (!email || !password) {
+      setError('Please fill in all fields');
+      return;
+    }
+    
+    setLoading(true);
+    try {
+      const response = await api.post('/api/auth/login', { email, password });
+      saveAuth(response.data);
+      navigate('/');
+    } catch (err) {
+      setError(err.response?.data?.error || 'Login failed. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="container" style={{ paddingTop: '2rem' }}>
+      <div className="form-container">
+        <h2>Welcome Back 👋</h2>
+        <p style={{ textAlign: 'center', color: 'var(--text-muted)', marginBottom: '2rem' }}>
+          Sign in to continue ordering delicious food
+        </p>
+        
+        {error && <div className="alert alert-error">{error}</div>}
+        
+        <form onSubmit={handleSubmit}>
+          <div className="form-group">
+            <label htmlFor="email">Email Address</label>
+            <input
+              id="email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@example.com"
+              autoComplete="email"
+            />
+          </div>
+          
+          <div className="form-group">
+            <label htmlFor="password">Password</label>
+            <input
+              id="password"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Enter your password"
+              autoComplete="current-password"
+            />
+          </div>
+          
+          <button 
+            type="submit" 
+            className="btn btn-primary"
+            disabled={loading}
+            style={{ width: '100%', marginTop: '0.5rem' }}
+          >
+            {loading ? 'Signing in...' : 'Sign In'}
+          </button>
+        </form>
+        
+        <p style={{ marginTop: '1.5rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
+          Don't have an account?{' '}
+          <Link to="/signup" style={{ color: 'var(--primary)', fontWeight: 600 }}>
+            Create one
+          </Link>
+        </p>
+      </div>
+    </div>
+  );
+}

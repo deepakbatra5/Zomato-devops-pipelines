@@ -12,6 +12,7 @@
     repo_url: https://github.com/harsh-raj04/Zomato-devops-pipeline.git
     branch: "{{ lookup('env', 'GIT_BRANCH') | default('main', true) | regex_replace('^origin/', '') }}"
     public_ip: "{{ lookup('env', 'EC2_PUBLIC_IP') | default('13.203.190.4', true) }}"
+    openai_api_key: "{{ lookup('env', 'OPENAI_API_KEY') | default('', true) }}"
 
   tasks:
     # ==========================================
@@ -87,6 +88,7 @@
     - name: Start application with docker-compose
       shell: |
         export VITE_API_BASE=http://{{ public_ip }}:4000
+        export OPENAI_API_KEY="{{ openai_api_key }}"
         docker compose build --no-cache frontend
         docker compose up -d --build || docker-compose up -d --build
       args:
@@ -94,6 +96,7 @@
       become_user: ubuntu
       environment:
         VITE_API_BASE: "http://{{ public_ip }}:4000"
+        OPENAI_API_KEY: "{{ openai_api_key }}"
 
     # ==========================================
     # 7. WAIT FOR SERVICES TO BE HEALTHY

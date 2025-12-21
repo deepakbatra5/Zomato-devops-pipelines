@@ -17,6 +17,9 @@ pipeline {
         
         // Ansible configuration
         ANSIBLE_VAULT_CREDENTIALS_ID = 'ansible-vault-password'
+        
+        // OpenAI API Key (stored in Jenkins credentials)
+        OPENAI_CREDENTIALS_ID = 'openai-api-key'
     }
     
     options {
@@ -173,8 +176,11 @@ pipeline {
                 echo '🚀 Deploying to AWS EC2...'
                 
                 script {
-                    // Use SSH credentials to run Ansible
-                    withCredentials([sshUserPrivateKey(credentialsId: SSH_CREDENTIALS_ID, keyFileVariable: 'SSH_KEY')]) {
+                    // Use SSH credentials and OpenAI API key for deployment
+                    withCredentials([
+                        sshUserPrivateKey(credentialsId: SSH_CREDENTIALS_ID, keyFileVariable: 'SSH_KEY'),
+                        string(credentialsId: OPENAI_CREDENTIALS_ID, variable: 'OPENAI_API_KEY')
+                    ]) {
                         sh '''
                             cd ansible
                             
@@ -191,8 +197,8 @@ pipeline {
                                 pip3 install ansible
                             }
                             
-                            # Run deployment playbook with SSH key
-                            ansible-playbook \
+                            # Run deployment playbook with SSH key and OpenAI API key
+                            OPENAI_API_KEY="${OPENAI_API_KEY}" ansible-playbook \
                                 -i inventory \
                                 deploy.yml \
                                 --private-key="$SSH_KEY" \
