@@ -98,7 +98,21 @@
         VITE_API_BASE: "https://foodhub.sbs"
         OPENAI_API_KEY: "{{ openai_api_key }}"
 
-    # ==========================================
+    # Wait for backend to be fully initialized with restaurant data
+    - name: Wait for backend API to be ready with restaurant data
+      uri:
+        url: "http://localhost:4000/api/restaurants"
+        method: GET
+        status_code: 200
+      register: api_result
+      until: api_result.status == 200 and (api_result.json | length) > 0
+      retries: 60
+      delay: 3
+      changed_when: false
+
+    - name: Display seeded restaurants count
+      debug:
+        msg: "✅ Database has {{ api_result.json | length }} restaurants ready"    # ==========================================
     # 7. WAIT FOR SERVICES TO BE HEALTHY
     # ==========================================
     - name: Wait for database to be healthy
